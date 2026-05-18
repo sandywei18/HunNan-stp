@@ -1,0 +1,59 @@
+﻿:root {
+  --text: #c9d4f7;
+  --text-h: #ffffff;
+  --bg: #081320;
+  --border: rgba(255,255,255,0.12);
+  --code-bg: rgba(255,255,255,0.05);
+  --accent: #4dbbff;
+  --accent-bg: rgba(77,187,255,0.15);
+  --accent-border: rgba(77,187,255,0.35);
+  --shadow: rgba(0,0,0,0.24) 0 18px 60px -20px;
+  font: 16px/1.6 'Noto Sans TC', sans-serif;
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #081320 0%, #05080f 100%);
+}
+
+#root {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+  padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  border: none;
+}
+
+textarea {
+  font-family: inherit;
+}
