@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Chart, registerables } from 'chart.js'
+import { createOrder, getOrders, getRanking } from './api.js'
 import './App.css'
 
 Chart.register(...registerables)
@@ -344,6 +345,10 @@ function App() {
   const [btStats, setBtStats] = useState([])
   const [btActive, setBtActive] = useState(false)
   const [bidFeedback, setBidFeedback] = useState('')
+  const [backendStatus, setBackendStatus] = useState('')
+  const [backendLoading, setBackendLoading] = useState(false)
+  const [remoteOrders, setRemoteOrders] = useState([])
+  const [rankingData, setRankingData] = useState([])
 
   const priceChartRef = useRef(null)
   const subChartRef = useRef(null)
@@ -366,6 +371,24 @@ function App() {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
+  }, [])
+
+  const loadBackendData = async () => {
+    try {
+      setBackendLoading(true)
+      const [ordersResponse, rankingResponse] = await Promise.all([getOrders(), getRanking()])
+      setRemoteOrders(ordersResponse.data || [])
+      setRankingData(rankingResponse.data || [])
+      setBackendStatus('後端已連線')
+    } catch (error) {
+      setBackendStatus(`後端連線失敗：${error.message}`)
+    } finally {
+      setBackendLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadBackendData()
   }, [])
 
   useEffect(() => {
@@ -507,7 +530,7 @@ function App() {
     return ''
   }
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (!isOrderOpen) {
       setFeedback('❌ 目前非交易時間（09:00–13:30），無法下單')
       return
@@ -535,6 +558,27 @@ function App() {
     ]
       .filter(Boolean)
       .join('\n')
+
+    const orderPayload = {
+      userId: orderForm.trader.trim() || `guest-${Date.now()}`,
+      symbol: orderForm.symbol,
+      action: orderForm.side,
+      quantity: orderForm.lots,
+      price: refPrice,
+      type: 'market',
+      notes: plan,
+    }
+
+    try {
+      setFeedback('⏳ 訂單已送出，正在同步後端...')
+      const response = await createOrder(orderPayload)
+      setRemoteOrders((prev) => [...prev, response.data])
+      setBackendStatus('最新訂單已同步至後端')
+    } catch (error) {
+      console.warn('Backend order sync failed', error)
+      setFeedback(`⚠️ 訂單已本地保存，但後端同步失敗：${error.message}`)
+    }
+
     const order = {
       id: Date.now(),
       day: state.day,
@@ -1039,6 +1083,11 @@ function App() {
                 <div className="index-chip-price">{isOrderOpen ? '開盤中 ✅' : '休市中'}</div>
                 <div className="index-chip-chg">09:00–13:30</div>
               </div>
+              <div className="index-chip">
+                <div className="index-chip-name">後端狀態</div>
+                <div className="index-chip-price">{backendLoading ? '連線中...' : backendStatus || '尚未連線'}</div>
+                <div className="index-chip-chg">/orders /ranking</div>
+              </div>
             </div>
 
             <div className="card alert-card">
@@ -1070,7 +1119,7 @@ function App() {
               <div className="team-card team-etf">
                 <div className="team-name">📦 ETF 組</div>
                 <div className="team-value">{formatMoney(etfTotal)}</div>
-                <div className="team-meta"><span>報酬率</span><span className={etfPct >= 0 ? 'up' : 'down'}>{(etfPct >= 0 ? '+' : '') + etfPct.toFixed(2)}%</span></span></div>
+                <div className="team-meta"><span>報酬率</span><span className={etfPct >= 0 ? 'up' : 'down'}>{(etfPct >= 0 ? '+' : '') + etfPct.toFixed(2)}%</span></div>
                 <div className="prog-bar"><div className="prog-fill fill-green" style={{ width: Math.min(Math.max(50 + etfPct * 3, 2), 98) + '%' }} /></div>
                 <div className="team-foot">持倉 {state.etfHoldings.length} 檔 | 最高集中度 {state.etfHoldings.length ? Math.max(...state.etfHoldings.map((item) => (item.lots * 1000 * item.currentPrice) / INITIAL_CAPITAL * 100)).toFixed(1) : '0'}%</div>
               </div>
@@ -1251,6 +1300,7 @@ function App() {
                   <div className="metric-card-wrap"><div className="metric-card"><div className="metric-label">累積報酬率</div><div className="metric-val">{etfPct >= 0 ? '+' : ''}{etfPct.toFixed(2)}%</div></div><div className="metric-card"><div className="metric-label">年化報酬率（估）</div><div className="metric-val">{etfPct.toFixed(2)}%</div></div><div className="metric-card"><div className="metric-label">Sharpe Ratio</div><div className="metric-val">--</div></div><div className="metric-card"><div className="metric-label">最大回撤 (MDD)</div><div className="metric-val">--</div></div><div className="metric-card"><div className="metric-label">波動率</div><div className="metric-val">--</div></div><div className="metric-card"><div className="metric-label">勝率（日）</div><div className="metric-val">--</div></div></div>
                 <div className="card"><div className="card-title"><span className="dot dot-blue" />資產走勢曲線（Equity Curve）</div><div className="chart-wrap chart-h300"><canvas ref={equityChartRef} /></div></div>
                 <div className="card"><div className="card-title"><span className="dot dot-green" />每日報酬率分布</div><div className="chart-wrap chart-h200"><canvas ref={returnDistChartRef} /></div></div>
+              </div>
               </>
             )}
             {subTab === 'behavior' && (
